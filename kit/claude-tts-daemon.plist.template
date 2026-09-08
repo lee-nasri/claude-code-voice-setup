@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.__USER__.claude-tts-daemon</string>
+
+    <!-- The Kokoro speech engine. Until 2026-09-02 it existed only because
+         speak.sh spawned it when missing, so `pkill` left the Mac mute: that
+         spawn path had itself broken. KeepAlive makes a kill or a crash always
+         come back. main() probes the socket and exits if a live daemon owns it,
+         so this can never double-start. -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>__HOME__/.claude/tts/kokoro-venv/bin/python</string>
+        <string>__HOME__/.claude/tts/kokoro_daemon.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__HOME__/.claude/tts</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <!-- SuccessfulExit=false, NOT KeepAlive=true. main() exits 0 when a live
+         daemon already owns the socket (a hand-started one), and plain KeepAlive
+         would respawn that instantly → model load → exit 0 → forever. Restart
+         on abnormal exit and on being killed; stay quiet on a deliberate 0. -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <!-- Model load is ~1.2s; keeps any restart loop from spinning hot. -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>__HOME__/.claude/tts/daemon.err</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/.claude/tts/daemon.err</string>
+
+    <!-- No ProcessType (= Standard, performance cores). Background QoS put
+         generation on the E-cores at ~0.7x realtime, which produced ~10s gaps
+         mid-message — same reason the watcher's job does not set it. -->
+</dict>
+</plist>

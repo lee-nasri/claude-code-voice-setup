@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.__USER__.claude-tts-watcher</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>__HOME__/.claude/tts/watcher.sh</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardErrorPath</key>
+    <string>__HOME__/.claude/tts/watcher.err</string>
+
+    <!-- No ProcessType (= Standard, performance cores). It was Background until
+         2026-08-30, which put the watcher AND the kokoro daemon it spawns on the
+         efficiency cores: generation fell from ~0.2x to ~1.0x of realtime, so the
+         short opening chunk ran out of audio and left a ~7s silence before the
+         second sentence. Measured both ways before changing this. -->
+</dict>
+</plist>

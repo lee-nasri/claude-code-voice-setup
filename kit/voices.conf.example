@@ -1,0 +1,9 @@
+# team=voice map for spoken messages.
+# The team name is the suffix of the queue filename: 1788451616-teamE.txt -> teamE
+# Exact match wins, then a prefix rule like `team*=am_michael`, then `default`.
+# Voice names come from voices-v1.0.bin — 54 of them. Run:
+#   ~/.claude/tts/kokoro-venv/bin/python -c "from kokoro_onnx import Kokoro; \
+#     print(sorted(Kokoro('$HOME/.claude/tts/kokoro-v1.0.onnx','$HOME/.claude/tts/voices-v1.0.bin').get_voices()))"
+default=bf_emma
+work=af_bella
+side=am_michael
