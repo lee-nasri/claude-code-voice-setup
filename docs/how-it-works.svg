@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="470" viewBox="0 0 1600 470" role="img"
+           aria-label="Handy with Whisper turns your voice into text, Claude works in text as before, and Kokoro turns its answer into speech; both models run on the Mac">
+        <defs>
+          <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5"
+                  markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0 0 L10 5 L0 10 z" fill="#8b93a3"/>
+          </marker>
+        </defs>
+        <rect width="1600" height="470" fill="#ffffff"/>
+
+        <!-- you, talking -->
+        <g font-family="-apple-system,Segoe UI,Helvetica,Arial">
+          <circle cx="88" cy="236" r="32" fill="#3f4d5c"/>
+          <path d="M36 320c0-29 23-52 52-52s52 23 52 52z" fill="#4a5262"/>
+          <g stroke="#1f7a54" fill="none" stroke-width="5" stroke-linecap="round" opacity=".9">
+            <path d="M142 220a28 28 0 0 1 0 32"/>
+            <path d="M160 208a50 50 0 0 1 0 56"/>
+          </g>
+          <text x="88" y="366" text-anchor="middle" font-size="22" font-weight="600" fill="#4a5262">you, talking</text>
+        </g>
+
+        <!-- Handy -->
+        <g font-family="-apple-system,Segoe UI,Helvetica,Arial">
+          <rect x="234" y="150" width="308" height="196" rx="14" fill="#e9f6ef" stroke="#1f7a54" stroke-width="3"/>
+          <text x="388" y="206" text-anchor="middle" font-size="38" font-weight="700" fill="#14181f">Handy</text>
+          <text x="388" y="244" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace"
+                font-size="20" fill="#1f7a54">whisper large-v3-turbo</text>
+          <text x="388" y="282" text-anchor="middle" font-size="20" fill="#4a5262">hold option + space</text>
+          <text x="388" y="312" text-anchor="middle" font-size="19" fill="#8b93a3">1.6 GB · free &amp; open source</text>
+          <rect x="281" y="108" width="214" height="34" rx="17" fill="#1f7a54"/>
+          <text x="388" y="132" text-anchor="middle" font-size="18" font-weight="700" letter-spacing="1.6" fill="#eafaf1">SPEECH → TEXT</text>
+        </g>
+
+        <!-- Claude -->
+        <g font-family="-apple-system,Segoe UI,Helvetica,Arial">
+          <rect x="642" y="136" width="316" height="224" rx="16" fill="#14181f"/>
+          <text x="800" y="216" text-anchor="middle" font-size="42" font-weight="700" fill="#ffffff">Claude</text>
+          <text x="800" y="262" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace"
+                font-size="22" fill="#9aa3b2">text in → text out</text>
+          <text x="800" y="304" text-anchor="middle" font-size="20" fill="#6f7889">not one line of it changed</text>
+          <rect x="706" y="94" width="188" height="34" rx="17" fill="#ffffff" stroke="#c8cfda" stroke-width="2"/>
+          <text x="800" y="118" text-anchor="middle" font-size="18" font-weight="700" letter-spacing="1.6" fill="#4a5262">UNCHANGED</text>
+        </g>
+
+        <!-- Kokoro -->
+        <g font-family="-apple-system,Segoe UI,Helvetica,Arial">
+          <rect x="1058" y="150" width="308" height="196" rx="14" fill="#eeecfd" stroke="#5b4cd6" stroke-width="3"/>
+          <text x="1212" y="206" text-anchor="middle" font-size="38" font-weight="700" fill="#14181f">Kokoro</text>
+          <text x="1212" y="244" text-anchor="middle" font-family="ui-monospace,SFMono-Regular,Menlo,monospace"
+                font-size="20" fill="#5b4cd6">kokoro-onnx v1.0</text>
+          <text x="1212" y="282" text-anchor="middle" font-size="20" fill="#4a5262">54 voices, one per session</text>
+          <text x="1212" y="312" text-anchor="middle" font-size="19" fill="#8b93a3">350 MB · Apache-2.0</text>
+          <rect x="1105" y="108" width="214" height="34" rx="17" fill="#5b4cd6"/>
+          <text x="1212" y="132" text-anchor="middle" font-size="18" font-weight="700" letter-spacing="1.6" fill="#efedfe">TEXT → SPEECH</text>
+        </g>
+
+        <!-- you, listening -->
+        <g font-family="-apple-system,Segoe UI,Helvetica,Arial">
+          <circle cx="1512" cy="236" r="32" fill="#3f4d5c"/>
+          <path d="M1460 320c0-29 23-52 52-52s52 23 52 52z" fill="#4a5262"/>
+          <g stroke="#5b4cd6" fill="none" stroke-width="5" stroke-linecap="round" opacity=".9">
+            <path d="M1458 220a28 28 0 0 0 0 32"/>
+            <path d="M1440 208a50 50 0 0 0 0 56"/>
+          </g>
+          <text x="1512" y="366" text-anchor="middle" font-size="22" font-weight="600" fill="#4a5262">you, listening</text>
+        </g>
+
+        <!-- flow -->
+        <g stroke="#8b93a3" stroke-width="3" marker-end="url(#ah2)">
+          <line x1="176" y1="242" x2="222" y2="242"/>
+          <line x1="554" y1="242" x2="630" y2="242"/>
+          <line x1="970" y1="242" x2="1046" y2="242"/>
+          <line x1="1378" y1="242" x2="1424" y2="242"/>
+        </g>
+        <g font-family="-apple-system,Segoe UI,Helvetica,Arial" font-size="19" fill="#8b93a3" text-anchor="middle">
+          <text x="199" y="224">voice</text>
+          <text x="592" y="224" font-weight="700" fill="#4a5262">text</text>
+          <text x="1008" y="224" font-weight="700" fill="#4a5262">text</text>
+          <text x="1401" y="224">voice</text>
+        </g>
+
+        <!-- the band that matters -->
+        <g font-family="-apple-system,Segoe UI,Helvetica,Arial">
+          <rect x="234" y="398" width="1132" height="50" rx="10" fill="#eef1f5" stroke="#c2cad6" stroke-width="2"/>
+          <text x="800" y="430" text-anchor="middle" font-size="23" font-weight="600" fill="#14181f">
+            Both models run on your Mac — no API key, no account, nothing leaves the machine.
+          </text>
+        </g>
+      </svg>

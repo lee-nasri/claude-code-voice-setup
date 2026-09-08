@@ -3,6 +3,8 @@
 Talk to Claude Code, and hear it answer — with both models running on your own Mac.
 No API key, no account, nothing leaves the machine.
 
+![How it works: Handy turns your voice into text, Claude works in text exactly as before, Kokoro turns its answer into speech](docs/how-it-works.png)
+
 You get:
 
 - **hold `option+space`, speak, release** — your words land in the prompt as text
