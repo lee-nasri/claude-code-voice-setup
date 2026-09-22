@@ -115,7 +115,12 @@ and release.
 
 ## Phase 2 — the talking half (text → speech)
 
-Engine: **Kokoro v1.0** via `kokoro-onnx`, Apache-2.0, running locally. 54 voices in one file.
+Engine: **Kokoro v1.0**, run through `kokoro-onnx`, locally. 54 voices in one file.
+
+Two projects, two licences, and it is worth keeping them straight: the **model weights**
+([hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M)) are **Apache-2.0**, while
+[thewh1teagle/kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) — the pip package that
+loads them — is **MIT**. Both permissive; neither requires anything of the user here.
 
 ### 2.1 Layout and virtualenv
 
