@@ -5,7 +5,7 @@ Producer thread generates sentence chunks ahead; the main thread feeds a single
 always-open audio stream, so playback never stops between chunks. Generation is
 ~4x faster than realtime, so after the ~1s first chunk the producer stays ahead.
 
-Usage: kokoro_stream.py <cache_wav_path> <voice> <text...>
+Usage: kokoro_stream.py <cache_wav_path> <voice> <speed> <text...>
 Writes the full concatenated wav to cache_wav_path afterwards (replay cache).
 SIGTERM/SIGINT stop playback immediately (instant mute)."""
 import queue
@@ -53,7 +53,14 @@ def die(*_):
 signal.signal(signal.SIGTERM, die)
 signal.signal(signal.SIGINT, die)
 
-cache_out, VOICE, text = sys.argv[1], sys.argv[2], " ".join(sys.argv[3:])
+# speed sits BEFORE the text, not after: the text is `" ".join(argv[N:])`, so a
+# trailing argument would be joined into the sentence and read out loud.
+cache_out, VOICE = sys.argv[1], sys.argv[2]
+try:
+    SPEED = min(2.5, max(0.5, float(sys.argv[3])))
+except (IndexError, ValueError):
+    SPEED = 1.0
+text = " ".join(sys.argv[4:])
 
 # Chunking shared with the daemon: small first clause for fast start, big
 # later chunks against audible gaps (tuning history in tts_text.py).
@@ -61,17 +68,31 @@ from tts_text import chunk_text
 
 chunks = chunk_text(text)
 
-k = Kokoro(f"{HOME}/kokoro-v1.0.onnx", f"{HOME}/voices-v1.0.bin")
+import thai_engine
+
+# A Thai voice needs the Thai bundle and nothing else — loading the 54-voice
+# English model for it would cost ~1.2s and be thrown away.
+THAI = thai_engine.is_thai_voice(VOICE)
+k = None if THAI else Kokoro(f"{HOME}/kokoro-v1.0.onnx", f"{HOME}/voices-v1.0.bin")
 q: "queue.Queue[np.ndarray | None]" = queue.Queue(maxsize=4)
 
 
 def produce():
-    for chunk in chunks:
-        if stop.is_set():
-            break
-        samples, _ = k.create(chunk, voice=VOICE, speed=1.0, lang="en-gb")
-        q.put(np.asarray(samples, dtype=np.float32))
-    q.put(None)
+    # The sentinel must survive a failure: without it a raising generator left
+    # the player blocked on q.get() forever instead of exiting.
+    try:
+        for chunk in chunks:
+            if stop.is_set():
+                break
+            if THAI:
+                samples = thai_engine.create(chunk, VOICE, SPEED)
+            else:
+                samples, _ = k.create(chunk, voice=VOICE, speed=SPEED, lang="en-gb")
+            q.put(np.asarray(samples, dtype=np.float32))
+    except Exception as e:
+        print(f"[stream] generate failed: {e}", file=sys.stderr, flush=True)
+    finally:
+        q.put(None)
 
 
 threading.Thread(target=produce, daemon=True).start()

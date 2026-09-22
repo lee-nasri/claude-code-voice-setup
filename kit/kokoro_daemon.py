@@ -215,28 +215,43 @@ def client_gone(conn: socket.socket) -> bool:
             pass
 
 
-SPEED_CONF = f"{HOME}/speed.conf"
-
-
 def speech_speed() -> float:
-    """Playback rate, re-read per message so the Monitor's dropdown takes effect
-    without a daemon restart. File wins, then TTS_SPEED, then 1.25."""
+    """Fallback rate only.
+
+    The single global speed.conf was removed 2026-09-14 — rate is now a property
+    of the VOICE (speeds.conf, resolved by speak.sh and sent per request). This
+    is reached only by a caller that sends no speed at all, so it must be the
+    neutral 1.0 and nothing cleverer: guessing here would silently override the
+    voice's own setting.
+    """
+    return 1.0
+
+
+def req_speed(req: dict) -> float:
+    """Rate for THIS message: the caller's per-voice number, else the global.
+
+    speak.sh resolves the voice's rate and puts it in the cache key, then sends
+    the same number here — so the audio on disk always matches the key it is
+    filed under. Falling back to speech_speed() keeps an old client (no speed
+    field) working unchanged.
+    """
     try:
-        with open(SPEED_CONF) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    return min(2.5, max(0.5, float(line)))
-    except (OSError, ValueError):
-        pass
-    try:
-        return min(2.5, max(0.5, float(os.environ.get("TTS_SPEED", "1.25"))))
-    except ValueError:
-        return 1.25
+        s = float(req.get("speed") or 0)
+    except (TypeError, ValueError):
+        s = 0.0
+    return min(2.5, max(0.5, s)) if s > 0 else speech_speed()
 
 
 k = Kokoro(f"{HOME}/kokoro-v1.0.onnx", f"{HOME}/voices-v1.0.bin")
 k.create("Warm up.", voice="bf_emma", speed=speech_speed(), lang="en-gb")
+
+# Thai is a second model (~325 MB resident). Held warm here for the same reason
+# the English one is: a lazy load costs the first Thai line ~2s of silence.
+import thai_engine  # noqa: E402  (after HOME is resolved)
+
+if thai_engine.available():
+    print(f"[daemon] thai warm: {thai_engine.warm()}"
+          f"{' — ' + thai_engine.load_error() if thai_engine.load_error() else ''}", flush=True)
 speak_lock = threading.Lock()  # watcher serializes anyway; belt and braces
 
 # Sized from daemon.err, not taste. Longest real message so far: 4,122 chars /
@@ -246,6 +261,25 @@ LOCK_WAIT = 30      # the watcher sends one at a time, so waiting means trouble
 MSG_DEADLINE = 600  # 2.3x the longest legitimate message
 STALL_LIMIT = 45    # no completed write for this long = wedged (260x a slice)
 GEN_LIMIT = 120     # no chunk out of the generator for this long = wedged
+RESUME_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resume.json")
+
+
+def write_resume(cache: str, at: int) -> None:
+    """Where a cut message stopped: {cache, at, when}, atomically replaced.
+
+    Keyed by the CACHE PATH, which is sha256(voice+text) — so the watcher can
+    only ever apply this to the same message, never to whatever spoke next.
+    Written on every incomplete playback (mute, skip, barge-in, pause); only the
+    continue-style pause reads it, the rest ignore it and it ages out harmlessly.
+    """
+    payload = {"cache": cache, "at": max(0, int(at)), "when": time.time()}
+    tmp = RESUME_PATH + ".tmp"
+    try:
+        with open(tmp, "w") as f:
+            json.dump(payload, f)
+        os.replace(tmp, RESUME_PATH)
+    except OSError:
+        pass
 
 
 def play(conn: socket.socket, req: dict, chunks, stop: threading.Event,
@@ -256,16 +290,23 @@ def play(conn: socket.socket, req: dict, chunks, stop: threading.Event,
     import queue as q_mod
 
     t0 = time.time()
-    q: "q_mod.Queue[np.ndarray | None]" = q_mod.Queue(maxsize=4)
+    q: "q_mod.Queue[tuple[int, np.ndarray] | None]" = q_mod.Queue(maxsize=4)
+    start = int(req.get("start") or 0)      # resume point, in whole sentences
 
     def produce():
         try:
-            for chunk in chunks:
+            for idx, chunk in enumerate(chunks):
                 if stop.is_set():
                     break
-                samples, _ = k.create(chunk, voice=req["voice"],
-                                      speed=speech_speed(), lang="en-gb")
-                q.put(np.asarray(samples, dtype=np.float32))
+                if thai_engine.is_thai_voice(req["voice"]):
+                    samples = thai_engine.create(chunk, req["voice"], req_speed(req))
+                else:
+                    samples, _ = k.create(chunk, voice=req["voice"],
+                                          speed=req_speed(req), lang="en-gb")
+                # the index rides along so the player always knows which
+                # sentence is in the speakers — that is what "continue where
+                # you left off" resumes from (2026-09-04)
+                q.put((start + idx, np.asarray(samples, dtype=np.float32)))
         except Exception as e:
             print(f"[daemon] generate failed: {e}", flush=True)
             set_phase("generating", f"generate: {e}")
@@ -281,12 +322,13 @@ def play(conn: socket.socket, req: dict, chunks, stop: threading.Event,
     with stream as out:
         while not stop.is_set():
             try:
-                samples = q.get(timeout=GEN_LIMIT)
+                item = q.get(timeout=GEN_LIMIT)
             except Exception:
                 set_phase("generating", f"no chunk within {GEN_LIMIT}s")
                 break
-            if samples is None:
+            if item is None:
                 break
+            box["at"], samples = item
             if not first_logged:
                 print(f"[daemon] first-audio {time.time() - t0:.2f}s "
                       f"chunks={len(chunks)} chars={len(req['text'])}", flush=True)
@@ -304,11 +346,19 @@ def play(conn: socket.socket, req: dict, chunks, stop: threading.Event,
     if played and not stop.is_set():
         sf.write(req["cache"], np.concatenate(played), SR,
                  format="WAV", subtype="PCM_16")
+    else:
+        write_resume(req.get("cache", ""), box.get("at", start))
     box["done"] = True
 
 
 def speak(conn: socket.socket, req: dict) -> None:
     chunks = chunk_text(req["text"])
+    at = int(req.get("start") or 0)
+    if at > 0:
+        # A resumed message starts at the beginning of the sentence it was cut
+        # in — not mid-word, which would clip a breath and sound broken.
+        chunks = chunks[at:]
+        print(f"[daemon] resuming at sentence {at + 1} ({len(chunks)} left)", flush=True)
     if not chunks:
         conn.sendall(b"done\n")
         return

@@ -4,6 +4,18 @@
 # Voice names come from voices-v1.0.bin — 54 of them. Run:
 #   ~/.claude/tts/kokoro-venv/bin/python -c "from kokoro_onnx import Kokoro; \
 #     print(sorted(Kokoro('$HOME/.claude/tts/kokoro-v1.0.onnx','$HOME/.claude/tts/voices-v1.0.bin').get_voices()))"
+#
+# A key may also be `{team}__{sid8}` — a single session rather than the whole team.
+# That is what lets two forked windows of one team hold two different voices; a
+# session with no line of its own falls back to its team's. See voice-lookup.sh.
 default=bf_emma
 work=af_bella
 side=am_michael
+
+# Thai voices (Phase 2.8). None of these exist until the Thai model is installed —
+# an unknown voice here silently falls back to the default, so it is safe to leave
+# them commented until then.
+#thai=th_fah
+# th_fah   female, young, warm      th_jane  female, mid, clear
+# th_ton   male, teen, bright       th_krit  male, young, clear
+# th_bank  male, elderly, deep

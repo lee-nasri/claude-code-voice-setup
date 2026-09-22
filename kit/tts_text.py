@@ -9,8 +9,43 @@ import re
 FIRST_MAX_WORDS = 10
 LATER_MIN_WORDS = 25
 
+# Thai writes no full stops and no spaces inside a clause — the space IS the
+# clause break, so the English splitter would return the whole message as one
+# chunk and the first-sound-fast rule would be lost.
+THAI = re.compile(r"[฀-๿]")
+
+# Chunk sizes RAMP instead of jumping 1 -> 5 (fixed 2026-09-21).
+#
+# The rule that keeps speech continuous: generating the NEXT chunk must finish
+# before the CURRENT one stops playing. Measured on this Mac, Thai generates at
+# ~2x realtime — 0.62s of compute per 1.25s of speech — so a chunk can cover a
+# successor at most ~2x its own size. The old 1 -> 5 jump asked one phrase to
+# cover five, and the queue ran dry for ~1.9s right after the opening phrase:
+#
+#   speak c0 1.25s  vs  generate c1 3.17s   STARVED
+#
+# Each step below stays under that 2x limit, so every chunk pays for the next.
+# The tail repeats the last value; 5 phrases is where speech is long enough
+# that generation is never the bottleneck again.
+THAI_CHUNK_RAMP = (1, 2, 3, 5)
+
+
+def chunk_text_thai(text: str) -> list[str]:
+    phrases = [p for p in text.split() if p]
+    if not phrases:
+        return []
+    chunks, i, step = [], 0, 0
+    while i < len(phrases):
+        take = THAI_CHUNK_RAMP[min(step, len(THAI_CHUNK_RAMP) - 1)]
+        chunks.append(" ".join(phrases[i : i + take]))
+        i += take
+        step += 1
+    return chunks
+
 
 def chunk_text(text: str) -> list[str]:
+    if THAI.search(text):
+        return chunk_text_thai(text)
     sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
     if not sentences:
         return []
