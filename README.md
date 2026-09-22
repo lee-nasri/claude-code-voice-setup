@@ -16,7 +16,7 @@ You get:
 ## Install
 
 ```bash
-git clone git@github.com:lee-nasri/claude-code-voice-setup.git
+git clone https://github.com/lee-nasri/claude-code-voice-setup.git
 cd claude-code-voice-setup
 claude
 ```
@@ -39,6 +39,7 @@ own and needs no background jobs at all.
 |---|---|---|
 | you → Claude | [Handy](https://handy.computer) | push-to-talk dictation, Whisper `large-v3-turbo` running locally |
 | Claude → you | [Kokoro](https://github.com/hexgrad/kokoro) | 54 voices in one 326 MB file, Apache-2.0, running locally |
+| Claude → you, in Thai | [wayu-kokoro-thai-v1](https://huggingface.co/kunato/wayu-kokoro-thai-v1) | optional second model, 5 Thai voices, Apache-2.0, also local |
 
 Plus the small system around them, which is the part that took the time:
 
@@ -51,12 +52,14 @@ Plus the small system around them, which is the part that took the time:
 - **barge-in** — open the mic and the sentence stops mid-word, while every other session
   keeps its turn
 - **one voice per session** — the voice is an address; you know who is talking without looking
+- **Thai, if you want it** — the base model has no Thai voice, so a second model loads beside
+  it and the two are played identically. Optional, and skipping it changes nothing else
 
 ## Cost
 
 | | |
 |---|---|
-| Disk | ~1.6 GB dictation model + ~350 MB speech model + a virtualenv |
+| Disk | ~1.6 GB dictation model + ~350 MB speech model + a virtualenv (+ ~340 MB if you add Thai) |
 | Network | one-time downloads |
 | Money | none |
 | Data leaving your Mac | none, as long as post-processing stays off |

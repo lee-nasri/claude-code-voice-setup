@@ -156,6 +156,7 @@ in 2.5, and not `voices.conf.example` — that is handled in 2.4):
 ```bash
 cp kit/{speak.sh,watcher.sh,duck.sh,mic_hold.py,kokoro_daemon.py,kokoro_stream.py,tts_text.py,tts_client.py} \
    "$HOME/.claude/tts/"
+cp kit/{voice-lookup.sh,thai_engine.py} "$HOME/.claude/tts/"           # voice resolution + the Thai path
 cp kit/{ack.sh,regen-ack.sh,ack-phrases.conf} "$HOME/.claude/tts/"     # Phase 4 uses these
 chmod +x "$HOME/.claude/tts/"*.sh
 touch "$HOME/.claude/tts/ENABLED"          # present = allowed to speak; delete = mute
@@ -171,8 +172,10 @@ What each one is, so you can debug it later:
 | `watcher.sh` | watches the queue folder, plays messages in arrival order, owns mute / skip / pause / barge-in |
 | `mic_hold.py` | barge-in detector: mirrors "microphone in use" into a `HOLD` file |
 | `duck.sh` | lowers other audio while speaking, restores it afterwards |
-| `tts_text.py` | sentence chunking — small first chunk so sound starts fast, bigger later chunks |
+| `tts_text.py` | sentence chunking — small first chunk so sound starts fast, bigger later chunks. Thai has its own splitter, because Thai writes no spaces inside a clause |
 | `tts_client.py` | stdlib-only client for the daemon socket |
+| `voice-lookup.sh` | one copy of "which voice does this speaker key get", sourced by everything that needs it |
+| `thai_engine.py` | loads the Thai model when a `th_*` voice is asked for. **Degrades to "not available" instead of raising**, so a missing Thai bundle can never take the English voice down |
 | `ack.sh` | the instant chirp on enter (Phase 4) — plays a pre-rendered clip, never generates |
 | `regen-ack.sh` | renders those clips locally, one model load for the whole batch |
 | `ack-phrases.conf` | the sentences the chirp says, one per line — edit freely |
@@ -244,6 +247,74 @@ echo "Setup complete. This message arrived through the queue." \
 
 Step 4 is the only check that proves the whole chain. If nothing is heard, read
 [Troubleshooting](#troubleshooting) — start with `daemon.err`'s **modification time**.
+
+### 2.8 Thai voices — optional, skip freely
+
+**Ask the user whether they want this before downloading 340 MB.** English is complete without
+it, and everything above already works.
+
+`kokoro-v1.0.onnx` has no Thai voice, and the venv's espeak-ng has no Thai
+grapheme-to-phoneme either — so Thai is a **second model**, loaded beside the English one rather
+than replacing it. Both emit 24 kHz, so the rest of the system cannot tell them apart.
+
+```bash
+cd "$HOME/.claude/tts"
+./kokoro-venv/bin/pip install --quiet tltk pythainlp        # Thai word-splitting + G2P
+
+# the model is a git-lfs repo; without lfs the .onnx files arrive as 130-byte pointers
+brew install git-lfs && git lfs install
+git clone https://huggingface.co/kunato/wayu-kokoro-thai-v1 kokoro-thai
+```
+
+**Check the bytes before going further** — the same rule as 2.2, and the failure looks the same
+(silence at generation time, hours later):
+
+```bash
+cd "$HOME/.claude/tts/kokoro-thai/onnx" && stat -f '%z %N' *.onnx
+```
+
+```
+33721740  curves_fp32.onnx
+213445776 decoder_fp32.onnx
+78259639  prosody_fp32.onnx
+```
+
+A file of ~130 bytes means `git lfs` was not installed before the clone. Delete `kokoro-thai`,
+install it, clone again.
+
+**Then restart the daemon so it loads the new model** and verify:
+
+```bash
+launchctl kickstart -k "gui/$UID/com.<you>.claude-tts-daemon"
+sleep 20 && grep "thai warm" "$HOME/.claude/tts/daemon.err" | tail -1
+```
+
+Expected: `[daemon] thai warm: True`. `False` is followed by the reason on the same line.
+
+Finally, add a Thai voice to `voices.conf` and speak through the queue — the real test, same as
+2.7 step 4:
+
+```bash
+echo "thai=th_fah" >> "$HOME/.claude/tts/voices.conf"
+echo "สวัสดีครับ ระบบเสียงภาษาไทยทำงานแล้ว" \
+  > "$HOME/.claude/tts/queue/$(date +%s)-thai.txt"
+```
+
+Five voices ship with it: `th_fah` and `th_jane` (female), `th_ton`, `th_krit` and `th_bank`
+(male). They are ordinary entries in `voices.conf` — nothing else in the system treats them
+specially.
+
+| | |
+|---|---|
+| Model | [kunato/wayu-kokoro-thai-v1](https://huggingface.co/kunato/wayu-kokoro-thai-v1), Apache-2.0 |
+| Disk | ~340 MB (decoder 213 MB, prosody 78 MB, curves 34 MB) |
+| Extra RAM when warm | roughly the same again, held resident beside the English model |
+| First Thai line after a cold start | ~7 s vs ~4.5 s for English — the G2P tables load too |
+
+🔴 **One thing to know before you write to a Thai voice:** nothing in the code checks that the
+*text* is Thai. `kokoro_daemon.py` branches on the voice to pick the **engine**, and the Thai
+frontend is bilingual, so English sent to `th_fah` is read aloud in a Thai accent instead of
+failing. It sounds wrong and reports nothing. Match the language to the voice at write time.
 
 ---
 
@@ -379,7 +450,7 @@ something at a bad moment, they have no way to stop it.
 | Skip what is speaking | `touch ~/.claude/tts/skip/ALL` | or `skip/<name>` for one session |
 | Mute one session only | add its name on its own line in `~/.claude/tts/muted.conf` | others keep talking |
 | Talk over it (barge-in) | just open the mic (`option+space`) | cuts the sentence, other sessions keep their turn |
-| Change the speaking rate | one number in `~/.claude/tts/speed.conf` | `1.0` is normal; also used by the chirp |
+| Change the speaking rate | one line per voice in `~/.claude/tts/speeds.conf` — `bf_emma=1.25` | `1.0` is normal. Keyed on the VOICE, so one voice never sounds like two different people. Missing file means 1.0 everywhere |
 | Change a session's voice | edit `~/.claude/tts/voices.conf` | takes effect on the next message, no restart |
 | Turn the chirp off, keep speech | `touch ~/.claude/tts/ACK_OFF` | |
 | See what is queued | `ls ~/.claude/tts/queue/` | filenames are `<epoch>-<session>.txt` |
@@ -435,8 +506,26 @@ no `ProcessType` key.
 **Non-English comes out as gibberish.** `selected_language` is pinned to one language. Set it to
 `auto`.
 
-**There is no Thai voice.** True, and not fixable here — Kokoro ships English plus 7 other
-languages. Thai works on the *listening* side only.
+**There is no Thai voice.** Not in `kokoro-v1.0.onnx` — its 54 voices carry English plus 7 other
+languages, and none of them is Thai. Thai speech comes from a **second model**, installed in
+Phase 2.8. The listening half needs nothing extra.
+
+**Thai comes out as gibberish, or as English read with Thai letters.** The Thai bundle failed to
+load and the message fell through to the English voice, which will happily read anything.
+Nothing raises — that is deliberate, a broken Thai install must never silence the English voice.
+Ask the daemon what happened:
+
+```bash
+"$HOME/.claude/tts/kokoro-venv/bin/python" -c "
+import sys; sys.path.insert(0, '$HOME/.claude/tts')
+import thai_engine
+print('on disk:', thai_engine.available())
+thai_engine.warm()
+print('error  :', thai_engine.load_error() or 'none')"
+```
+
+`on disk: False` means the model never downloaded. An error naming `tltk` or `pythainlp` means
+the pip step in 2.8 was skipped.
 
 ---
 
@@ -446,7 +535,7 @@ languages. Thai works on the *listening* side only.
 launchctl unload -w "$HOME/Library/LaunchAgents/"*claude-tts-*.plist
 rm -f "$HOME/Library/LaunchAgents/"*claude-tts-*.plist
 pkill -f kokoro_daemon.py; pkill -f tts/mic_hold.py; pkill -f tts/watcher.sh
-rm -rf "$HOME/.claude/tts"                 # includes the 350 MB of models
+rm -rf "$HOME/.claude/tts"                 # includes the 350 MB speech model, and the Thai one if you added it
 brew uninstall --cask handy                # and remove the Speak-every-turn block from ~/.claude/CLAUDE.md
 # also delete the ack.sh UserPromptSubmit entry from ~/.claude/settings.json
 ```
@@ -460,7 +549,7 @@ Also remove Handy's models and settings if you want the disk back:
 
 | | |
 |---|---|
-| Disk | ~1.6 GB dictation model + ~350 MB speech model + a venv |
+| Disk | ~1.6 GB dictation model + ~350 MB speech model + a venv, plus ~340 MB if Thai is installed |
 | Network | one-time downloads only |
 | Money | none — both projects are free and open source |
 | Data leaving the Mac | **none**, provided `post_process_enabled` stays `false` |
